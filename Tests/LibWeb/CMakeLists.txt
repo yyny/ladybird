@@ -8,10 +8,11 @@ set(TEST_SOURCES
     TestMicrosyntax.cpp
     TestMimeSniff.cpp
     TestNumbers.cpp
+    TestRegressions.cpp
 )
 
 foreach(source IN LISTS TEST_SOURCES)
-    serenity_test("${source}" LibWeb LIBS LibWeb)
+    serenity_test("${source}" LibWeb LIBS LibWeb LibJS)
 endforeach()
 
 target_link_libraries(TestFetchURL PRIVATE LibURL)
