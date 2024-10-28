@@ -8,6 +8,7 @@
 
 #include <AK/Error.h>
 #include <AK/Format.h>
+#include <AK/Optional.h>
 #include <AK/Platform.h>
 #include <AK/String.h>
 #include <AK/Traits.h>
@@ -80,12 +81,211 @@ public:
     }
 
 private:
+    friend class Optional<FlyString>;
+
+    explicit FlyString(nullptr_t)
+        : m_data(Detail::StringBase(nullptr))
+    {
+    }
+
     explicit FlyString(Detail::StringBase data)
         : m_data(move(data))
     {
     }
 
     Detail::StringBase m_data;
+
+    bool is_invalid() const { return m_data.is_invalid(); }
+};
+
+template<>
+class Optional<FlyString> {
+    template<typename U>
+    friend class Optional;
+
+public:
+    using ValueType = FlyString;
+
+    Optional() = default;
+
+    template<SameAs<OptionalNone> V>
+    Optional(V) { }
+
+    Optional(Optional<FlyString> const& other)
+    {
+        if (other.has_value())
+            m_value = other.m_value;
+    }
+
+    Optional(Optional&& other)
+        : m_value(other.m_value)
+    {
+    }
+
+    template<typename U = FlyString>
+    requires(!IsSame<OptionalNone, RemoveCVReference<U>>)
+    explicit(!IsConvertible<U&&, FlyString>) Optional(U&& value)
+    requires(!IsSame<RemoveCVReference<U>, Optional<FlyString>> && IsConstructible<FlyString, U &&>)
+        : m_value(forward<U>(value))
+    {
+    }
+
+    template<SameAs<OptionalNone> V>
+    Optional& operator=(V)
+    {
+        clear();
+        return *this;
+    }
+
+    Optional& operator=(Optional const& other)
+    {
+        if (this != &other) {
+            clear();
+            m_value = other.m_value;
+        }
+        return *this;
+    }
+
+    Optional& operator=(Optional&& other)
+    {
+        if (this != &other) {
+            clear();
+            m_value = other.m_value;
+        }
+        return *this;
+    }
+
+    template<typename O>
+    ALWAYS_INLINE bool operator==(Optional<O> const& other) const
+    {
+        return has_value() == other.has_value() && (!has_value() || value() == other.value());
+    }
+
+    template<typename O>
+    ALWAYS_INLINE bool operator==(O const& other) const
+    {
+        return has_value() && value() == other;
+    }
+
+    void clear()
+    {
+        m_value = FlyString(nullptr);
+    }
+
+    [[nodiscard]] bool has_value() const
+    {
+        return !m_value.is_invalid();
+    }
+
+    [[nodiscard]] FlyString& value() &
+    {
+        VERIFY(has_value());
+        return m_value;
+    }
+
+    [[nodiscard]] FlyString const& value() const&
+    {
+        VERIFY(has_value());
+        return m_value;
+    }
+
+    [[nodiscard]] FlyString value() &&
+    {
+        return release_value();
+    }
+
+    [[nodiscard]] FlyString release_value()
+    {
+        VERIFY(has_value());
+        FlyString released_value = m_value;
+        clear();
+        return released_value;
+    }
+
+    [[nodiscard]] ALWAYS_INLINE FlyString value_or(FlyString const& fallback) const&
+    {
+        if (has_value())
+            return value();
+        return fallback;
+    }
+
+    [[nodiscard]] ALWAYS_INLINE FlyString value_or(FlyString&& fallback) &&
+    {
+        if (has_value())
+            return move(value());
+        return move(fallback);
+    }
+
+    template<typename Callback>
+    [[nodiscard]] ALWAYS_INLINE FlyString value_or_lazy_evaluated(Callback callback) const
+    {
+        if (has_value())
+            return value();
+        return callback();
+    }
+
+    template<typename Callback>
+    [[nodiscard]] ALWAYS_INLINE Optional<FlyString> value_or_lazy_evaluated_optional(Callback callback) const
+    {
+        if (has_value())
+            return value();
+        return callback();
+    }
+
+    template<typename Callback>
+    [[nodiscard]] ALWAYS_INLINE ErrorOr<FlyString> try_value_or_lazy_evaluated(Callback callback) const
+    {
+        if (has_value())
+            return value();
+        return TRY(callback());
+    }
+
+    template<typename Callback>
+    [[nodiscard]] ALWAYS_INLINE ErrorOr<Optional<FlyString>> try_value_or_lazy_evaluated_optional(Callback callback) const
+    {
+        if (has_value())
+            return value();
+        return TRY(callback());
+    }
+
+    [[nodiscard]] ALWAYS_INLINE FlyString const& operator*() const { return value(); }
+    [[nodiscard]] ALWAYS_INLINE FlyString& operator*() { return value(); }
+
+    ALWAYS_INLINE FlyString const* operator->() const { return &value(); }
+    ALWAYS_INLINE FlyString* operator->() { return &value(); }
+
+    template<typename F, typename MappedType = decltype(declval<F>()(declval<FlyString&>())), auto IsErrorOr = IsSpecializationOf<MappedType, ErrorOr>, typename OptionalType = Optional<ConditionallyResultType<IsErrorOr, MappedType>>>
+    ALWAYS_INLINE Conditional<IsErrorOr, ErrorOr<OptionalType>, OptionalType> map(F&& mapper)
+    {
+        if constexpr (IsErrorOr) {
+            if (has_value())
+                return OptionalType { TRY(mapper(value())) };
+            return OptionalType {};
+        } else {
+            if (has_value())
+                return OptionalType { mapper(value()) };
+
+            return OptionalType {};
+        }
+    }
+
+    template<typename F, typename MappedType = decltype(declval<F>()(declval<FlyString&>())), auto IsErrorOr = IsSpecializationOf<MappedType, ErrorOr>, typename OptionalType = Optional<ConditionallyResultType<IsErrorOr, MappedType>>>
+    ALWAYS_INLINE Conditional<IsErrorOr, ErrorOr<OptionalType>, OptionalType> map(F&& mapper) const
+    {
+        if constexpr (IsErrorOr) {
+            if (has_value())
+                return OptionalType { TRY(mapper(value())) };
+            return OptionalType {};
+        } else {
+            if (has_value())
+                return OptionalType { mapper(value()) };
+
+            return OptionalType {};
+        }
+    }
+
+private:
+    FlyString m_value = FlyString(nullptr);
 };
 
 template<>

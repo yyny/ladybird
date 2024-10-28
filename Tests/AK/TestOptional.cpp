@@ -8,7 +8,9 @@
 #include <LibTest/TestCase.h>
 
 #include <AK/ByteString.h>
+#include <AK/FlyString.h>
 #include <AK/Optional.h>
+#include <AK/String.h>
 #include <AK/Vector.h>
 
 TEST_CASE(basic_optional)
@@ -268,4 +270,84 @@ TEST_CASE(comparison_reference)
     EXPECT_NE(opt0, opt1);
     EXPECT_EQ(opt1, opt2);
     EXPECT_NE(opt1, opt3);
+}
+
+TEST_CASE(string_specialization)
+{
+    EXPECT_EQ(sizeof(Optional<String>), sizeof(String));
+
+    {
+        Optional<String> foo;
+
+        EXPECT(!foo.has_value());
+
+        foo = "bar"_string;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "bar"sv);
+    }
+
+    {
+        Optional<String> foo = "foo"_string;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "foo"sv);
+
+        foo = "bar"_string;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "bar"sv);
+    }
+
+    {
+        Optional<String> foo;
+
+        EXPECT(!foo.has_value());
+
+        String bar = "bar"_string;
+        foo = bar;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "bar"sv);
+    }
+}
+
+TEST_CASE(flystring_specialization)
+{
+    EXPECT_EQ(sizeof(Optional<FlyString>), sizeof(FlyString));
+
+    {
+        Optional<FlyString> foo;
+
+        EXPECT(!foo.has_value());
+
+        foo = "bar"_fly_string;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "bar"sv);
+    }
+
+    {
+        Optional<FlyString> foo = "foo"_fly_string;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "foo"sv);
+
+        foo = "bar"_fly_string;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "bar"sv);
+    }
+
+    {
+        Optional<FlyString> foo;
+
+        EXPECT(!foo.has_value());
+
+        FlyString bar = "bar"_fly_string;
+        foo = bar;
+
+        EXPECT(foo.has_value());
+        EXPECT_EQ(foo.value(), "bar"sv);
+    }
 }
