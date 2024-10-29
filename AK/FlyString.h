@@ -99,7 +99,7 @@ private:
 };
 
 template<>
-class Optional<FlyString> {
+class Optional<FlyString> : public OptionalBase<FlyString, Optional<FlyString>> {
     template<typename U>
     friend class Optional;
 
@@ -200,88 +200,6 @@ public:
         FlyString released_value = m_value;
         clear();
         return released_value;
-    }
-
-    [[nodiscard]] ALWAYS_INLINE FlyString value_or(FlyString const& fallback) const&
-    {
-        if (has_value())
-            return value();
-        return fallback;
-    }
-
-    [[nodiscard]] ALWAYS_INLINE FlyString value_or(FlyString&& fallback) &&
-    {
-        if (has_value())
-            return move(value());
-        return move(fallback);
-    }
-
-    template<typename Callback>
-    [[nodiscard]] ALWAYS_INLINE FlyString value_or_lazy_evaluated(Callback callback) const
-    {
-        if (has_value())
-            return value();
-        return callback();
-    }
-
-    template<typename Callback>
-    [[nodiscard]] ALWAYS_INLINE Optional<FlyString> value_or_lazy_evaluated_optional(Callback callback) const
-    {
-        if (has_value())
-            return value();
-        return callback();
-    }
-
-    template<typename Callback>
-    [[nodiscard]] ALWAYS_INLINE ErrorOr<FlyString> try_value_or_lazy_evaluated(Callback callback) const
-    {
-        if (has_value())
-            return value();
-        return TRY(callback());
-    }
-
-    template<typename Callback>
-    [[nodiscard]] ALWAYS_INLINE ErrorOr<Optional<FlyString>> try_value_or_lazy_evaluated_optional(Callback callback) const
-    {
-        if (has_value())
-            return value();
-        return TRY(callback());
-    }
-
-    [[nodiscard]] ALWAYS_INLINE FlyString const& operator*() const { return value(); }
-    [[nodiscard]] ALWAYS_INLINE FlyString& operator*() { return value(); }
-
-    ALWAYS_INLINE FlyString const* operator->() const { return &value(); }
-    ALWAYS_INLINE FlyString* operator->() { return &value(); }
-
-    template<typename F, typename MappedType = decltype(declval<F>()(declval<FlyString&>())), auto IsErrorOr = IsSpecializationOf<MappedType, ErrorOr>, typename OptionalType = Optional<ConditionallyResultType<IsErrorOr, MappedType>>>
-    ALWAYS_INLINE Conditional<IsErrorOr, ErrorOr<OptionalType>, OptionalType> map(F&& mapper)
-    {
-        if constexpr (IsErrorOr) {
-            if (has_value())
-                return OptionalType { TRY(mapper(value())) };
-            return OptionalType {};
-        } else {
-            if (has_value())
-                return OptionalType { mapper(value()) };
-
-            return OptionalType {};
-        }
-    }
-
-    template<typename F, typename MappedType = decltype(declval<F>()(declval<FlyString&>())), auto IsErrorOr = IsSpecializationOf<MappedType, ErrorOr>, typename OptionalType = Optional<ConditionallyResultType<IsErrorOr, MappedType>>>
-    ALWAYS_INLINE Conditional<IsErrorOr, ErrorOr<OptionalType>, OptionalType> map(F&& mapper) const
-    {
-        if constexpr (IsErrorOr) {
-            if (has_value())
-                return OptionalType { TRY(mapper(value())) };
-            return OptionalType {};
-        } else {
-            if (has_value())
-                return OptionalType { mapper(value()) };
-
-            return OptionalType {};
-        }
     }
 
 private:
